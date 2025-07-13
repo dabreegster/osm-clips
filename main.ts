@@ -15,7 +15,7 @@ function main() {
   }
 }
 
-// Returns the [path, full URL]
+// Returns the [cache path, full URL]
 function findSmallest(gjPath: string): [string, string] {
   let boundary = JSON.parse(fs.readFileSync(gjPath, { encoding: "utf8" }));
   if (
@@ -31,7 +31,8 @@ function findSmallest(gjPath: string): [string, string] {
   for (let f of overpassIndex.features) {
     if (booleanContains(f, boundary)) {
       let url = f.properties.urls.pbf;
-      return [url.slice("https://download.geofabrik.de/".length), url];
+      let pathName = url.slice("https://download.geofabrik.de/".length);
+      return [`overpass_cache/${pathName}`, url];
     }
   }
   throw new Error(`No Overpass region contains the boundary from ${gjPath}`);
@@ -54,8 +55,18 @@ function getOverpassIndex(): FeatureCollection {
 }
 
 function clip(gjPath: string) {
+  if (!gjPath.startsWith("input/")) {
+    throw new Error(`${gjPath} must be in input/`);
+  }
+
   let [bigPbFPath, url] = findSmallest(gjPath);
-  downloadIfNeeded(url, `overpass_cache/${bigPbFPath}`);
+  downloadIfNeeded(url, bigPbFPath);
+
+  let outPath = gjPath
+    .replace("input/", "output/")
+    .replace(".geojson", ".osm.pbf");
+  run(`mkdir -p ${path.dirname(outPath)}`);
+  run(`osmium extract -p ${gjPath} ${bigPbFPath} -o ${outPath} --overwrite`);
 }
 
 function downloadIfNeeded(url: string, outPath: string) {
@@ -64,9 +75,14 @@ function downloadIfNeeded(url: string, outPath: string) {
     console.log(`${outPath} already exists, not downloading it`);
   } catch (err) {
     console.log(`${outPath} missing, downloading it`);
-    execSync(`mkdir -p ${path.dirname(outPath)}`);
-    execSync(`wget ${url} -O ${outPath}`, { stdio: "inherit" });
+    run(`mkdir -p ${path.dirname(outPath)}`);
+    run(`wget ${url} -O ${outPath}`, { stdio: "inherit" });
   }
+}
+
+function run(command: string) {
+  console.log(`> ${command}`);
+  execSync(command, { stdio: "inherit" });
 }
 
 main();

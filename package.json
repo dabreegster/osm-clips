@@ -1,0 +1,20 @@
+{
+  "name": "osm-clips",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "osm-clips": "npx tsx main.ts",
+    "fmt": "npx prettier --write *.ts",
+    "check": "npx tsc main.ts --noEmit"
+  },
+  "author": "",
+  "license": "Apache-2.0",
+  "description": "",
+  "devDependencies": {
+    "@types/geojson": "^7946.0.16",
+    "@types/node": "^24.0.13",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

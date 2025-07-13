@@ -1,18 +1,22 @@
 import * as fs from "fs";
+import * as path from "path";
 import booleanContains from "@turf/boolean-contains";
 import area from "@turf/area";
 import { execSync } from "child_process";
-import type { MultiPolygon, FeatureCollection } from "geojson";
+import type { FeatureCollection } from "geojson";
 
-async function main() {
+function main() {
   if (process.argv[2] == "find-smallest") {
-    await findSmallest(process.argv[3]);
+    console.log(findSmallest(process.argv[3]));
+  } else if (process.argv[2] == "clip") {
+    clip(process.argv[3]);
   } else {
     console.log("Unknown command");
   }
 }
 
-async function findSmallest(gjPath: string) {
+// Returns the [path, full URL]
+function findSmallest(gjPath: string): [string, string] {
   let boundary = JSON.parse(fs.readFileSync(gjPath, { encoding: "utf8" }));
   if (
     boundary.type != "Feature" ||
@@ -26,23 +30,18 @@ async function findSmallest(gjPath: string) {
   let overpassIndex = getOverpassIndex();
   for (let f of overpassIndex.features) {
     if (booleanContains(f, boundary)) {
-      console.log(f.properties);
-      return;
+      let url = f.properties.urls.pbf;
+      return [url.slice("https://download.geofabrik.de/".length), url];
     }
   }
   throw new Error(`No Overpass region contains the boundary from ${gjPath}`);
 }
 
-function getOverpassIndex(): FeatureCollection<MultiPolygon, {}> {
-  try {
-    fs.readFileSync("overpass_cache/index-v1.json");
-  } catch (err) {
-    console.log("Overpass index missing, downloading it");
-    execSync("mkdir -p overpass_cache");
-    execSync(
-      "wget https://download.geofabrik.de/index-v1.json -O overpass_cache/index-v1.json",
-    );
-  }
+function getOverpassIndex(): FeatureCollection {
+  downloadIfNeeded(
+    "https://download.geofabrik.de/index-v1.json",
+    "overpass_cache/index-v1.json",
+  );
 
   let gj = JSON.parse(
     fs.readFileSync("overpass_cache/index-v1.json", {
@@ -52,6 +51,22 @@ function getOverpassIndex(): FeatureCollection<MultiPolygon, {}> {
   // Sort by smallest area first
   gj.features.sort((a: any, b: any) => area(a) - area(b));
   return gj;
+}
+
+function clip(gjPath: string) {
+  let [bigPbFPath, url] = findSmallest(gjPath);
+  downloadIfNeeded(url, `overpass_cache/${bigPbFPath}`);
+}
+
+function downloadIfNeeded(url: string, outPath: string) {
+  try {
+    fs.readFileSync(outPath);
+    console.log(`${outPath} already exists, not downloading it`);
+  } catch (err) {
+    console.log(`${outPath} missing, downloading it`);
+    execSync(`mkdir -p ${path.dirname(outPath)}`);
+    execSync(`wget ${url} -O ${outPath}`, { stdio: "inherit" });
+  }
 }
 
 main();

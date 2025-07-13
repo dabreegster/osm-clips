@@ -1,5 +1,7 @@
 *.swp
 node_modules/
+
 overpass_cache/
 input/
 output/
+manifest.json

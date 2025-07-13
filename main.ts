@@ -67,6 +67,38 @@ function clip(gjPath: string) {
     .replace(".geojson", ".osm.pbf");
   run(`mkdir -p ${path.dirname(outPath)}`);
   run(`osmium extract -p ${gjPath} ${bigPbFPath} -o ${outPath} --overwrite`);
+  updateManifest(
+    gjPath.slice("input/".length).slice(0, -".geojson".length),
+    getTimestamp(bigPbFPath),
+  );
+}
+
+function getTimestamp(pbfPath: string): string {
+  let out = JSON.parse(execSync(`osmium fileinfo -j ${pbfPath}`) as unknown as string);
+  return out.header.option.timestamp;
+}
+
+function updateManifest(boundaryPath: string, timestamp: string) {
+  let parts = [...boundaryPath.split("/")];
+  if (parts.length != 2) {
+    throw new Error(
+      `${boundaryPath} has an unexpected form -- should just be <REGION>/<BOUNDARY>`,
+    );
+  }
+  let [region, boundary] = parts;
+
+  let json = {};
+  try {
+    json = JSON.parse(fs.readFileSync("manifest.json", { encoding: "utf8" }));
+  } catch (err) {}
+
+  if (!Object.hasOwn(json, region)) {
+    json[region] = [];
+  }
+  json[region].push([boundary, timestamp]);
+  json[region].sort();
+
+  fs.writeFileSync("manifest.json", JSON.stringify(json));
 }
 
 function downloadIfNeeded(url: string, outPath: string) {
@@ -76,7 +108,7 @@ function downloadIfNeeded(url: string, outPath: string) {
   } catch (err) {
     console.log(`${outPath} missing, downloading it`);
     run(`mkdir -p ${path.dirname(outPath)}`);
-    run(`wget ${url} -O ${outPath}`, { stdio: "inherit" });
+    run(`wget ${url} -O ${outPath}`);
   }
 }
 

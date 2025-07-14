@@ -15,8 +15,8 @@ function main() {
   }
 }
 
-// Returns the [cache path, full URL]
-function findSmallest(gjPath: string): [string, string] {
+// Returns the [cache path, full URL, friendly name]
+function findSmallest(gjPath: string): [string, string, string] {
   let boundary = JSON.parse(fs.readFileSync(gjPath, { encoding: "utf8" }));
   if (
     boundary.type != "Feature" ||
@@ -27,12 +27,17 @@ function findSmallest(gjPath: string): [string, string] {
     );
   }
 
+  let friendlyName = boundary.properties.name;
+  if (!friendlyName) {
+    throw new Error(`${gjPath} doesn't have a 'name' property`);
+  }
+
   let overpassIndex = getOverpassIndex();
   for (let f of overpassIndex.features) {
     if (booleanContains(f, boundary)) {
       let url = f.properties.urls.pbf;
       let pathName = url.slice("https://download.geofabrik.de/".length);
-      return [`overpass_cache/${pathName}`, url];
+      return [`overpass_cache/${pathName}`, url, friendlyName];
     }
   }
   throw new Error(`No Overpass region contains the boundary from ${gjPath}`);
@@ -59,7 +64,7 @@ function clip(gjPath: string) {
     throw new Error(`${gjPath} must be in input/`);
   }
 
-  let [bigPbFPath, url] = findSmallest(gjPath);
+  let [bigPbFPath, url, friendlyName] = findSmallest(gjPath);
   downloadIfNeeded(url, bigPbFPath);
 
   let outPath = gjPath
@@ -69,16 +74,23 @@ function clip(gjPath: string) {
   run(`osmium extract -p ${gjPath} ${bigPbFPath} -o ${outPath} --overwrite`);
   updateManifest(
     gjPath.slice("input/".length).slice(0, -".geojson".length),
+    friendlyName,
     getTimestamp(bigPbFPath),
   );
 }
 
 function getTimestamp(pbfPath: string): string {
-  let out = JSON.parse(execSync(`osmium fileinfo -j ${pbfPath}`) as unknown as string);
+  let out = JSON.parse(
+    execSync(`osmium fileinfo -j ${pbfPath}`) as unknown as string,
+  );
   return out.header.option.timestamp;
 }
 
-function updateManifest(boundaryPath: string, timestamp: string) {
+function updateManifest(
+  boundaryPath: string,
+  friendlyName: string,
+  timestamp: string,
+) {
   let parts = [...boundaryPath.split("/")];
   if (parts.length != 2) {
     throw new Error(
@@ -89,16 +101,16 @@ function updateManifest(boundaryPath: string, timestamp: string) {
 
   let json = {};
   try {
-    json = JSON.parse(fs.readFileSync("manifest.json", { encoding: "utf8" }));
+    json = JSON.parse(fs.readFileSync("output/manifest.json", { encoding: "utf8" }));
   } catch (err) {}
 
   if (!Object.hasOwn(json, region)) {
     json[region] = [];
   }
-  json[region].push([boundary, timestamp]);
+  json[region].push([boundary, friendlyName, timestamp]);
   json[region].sort();
 
-  fs.writeFileSync("manifest.json", JSON.stringify(json));
+  fs.writeFileSync("output/manifest.json", JSON.stringify(json));
 }
 
 function downloadIfNeeded(url: string, outPath: string) {

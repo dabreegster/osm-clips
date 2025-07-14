@@ -10,6 +10,9 @@ function main() {
     console.log(findSmallest(process.argv[3]));
   } else if (process.argv[2] == "clip") {
     clip(process.argv[3]);
+  } else if (process.argv[2] == "sync-all") {
+    let skipExisting = false;
+    syncAll(skipExisting);
   } else {
     console.log("Unknown command");
   }
@@ -79,6 +82,24 @@ function clip(gjPath: string) {
   );
 }
 
+function syncAll(skipExisting: boolean) {
+  for (let gjPath of getAllFilePathsInDirectory("input")) {
+    if (skipExisting) {
+      let outPath = gjPath
+        .replace("input/", "output/")
+        .replace(".geojson", ".osm.pbf");
+      try {
+        fs.statSync(outPath);
+        console.log(`${outPath} exists, skipping`);
+        continue;
+      } catch (err) {}
+    }
+
+    console.log(`Working on ${gjPath}`);
+    clip(gjPath);
+  }
+}
+
 function getTimestamp(pbfPath: string): string {
   let out = JSON.parse(
     execSync(`osmium fileinfo -j ${pbfPath}`) as unknown as string,
@@ -101,7 +122,9 @@ function updateManifest(
 
   let json = {};
   try {
-    json = JSON.parse(fs.readFileSync("output/manifest.json", { encoding: "utf8" }));
+    json = JSON.parse(
+      fs.readFileSync("output/manifest.json", { encoding: "utf8" }),
+    );
   } catch (err) {}
 
   if (!Object.hasOwn(json, region)) {
@@ -110,7 +133,7 @@ function updateManifest(
   json[region].push([boundary, friendlyName, timestamp]);
   json[region].sort();
 
-  fs.writeFileSync("output/manifest.json", JSON.stringify(json));
+  fs.writeFileSync("output/manifest.json", JSON.stringify(json, null, "  "));
 }
 
 function downloadIfNeeded(url: string, outPath: string) {
@@ -127,6 +150,20 @@ function downloadIfNeeded(url: string, outPath: string) {
 function run(command: string) {
   console.log(`> ${command}`);
   execSync(command, { stdio: "inherit" });
+}
+
+// Returns the path to all files in a directory, recursing.
+function getAllFilePathsInDirectory(directoryPath: string): string[] {
+  let results: string[] = [];
+  for (let file of fs.readdirSync(directoryPath)) {
+    let filePath = path.join(directoryPath, file);
+    if (fs.statSync(filePath).isDirectory()) {
+      results = results.concat(getAllFilePathsInDirectory(filePath));
+    } else {
+      results.push(filePath);
+    }
+  }
+  return results;
 }
 
 main();

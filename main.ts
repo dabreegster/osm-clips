@@ -128,10 +128,9 @@ function updateManifest(
   } catch (err) {}
 
   if (!Object.hasOwn(json, region)) {
-    json[region] = [];
+    json[region] = {};
   }
-  json[region].push([boundary, friendlyName, timestamp]);
-  json[region].sort();
+  json[region][boundary] = [friendlyName, timestamp];
 
   fs.writeFileSync("output/manifest.json", JSON.stringify(json, null, "  "));
 }

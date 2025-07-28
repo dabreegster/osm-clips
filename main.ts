@@ -74,7 +74,10 @@ function clip(gjPath: string) {
     .replace("input/", "output/")
     .replace(".geojson", ".osm.pbf");
   run(`mkdir -p ${path.dirname(outPath)}`);
-  run(`osmium extract -p ${gjPath} ${bigPbFPath} -o ${outPath} --overwrite`);
+  // Preserve the timestamp
+  run(
+    `osmium extract -p ${gjPath} ${bigPbFPath} -o ${outPath} --overwrite --output-header=osmosis_replication_timestamp!`,
+  );
   updateManifest(
     gjPath.slice("input/".length).slice(0, -".geojson".length),
     friendlyName,
@@ -104,7 +107,7 @@ function getTimestamp(pbfPath: string): string {
   let out = JSON.parse(
     execSync(`osmium fileinfo -j ${pbfPath}`) as unknown as string,
   );
-  return out.header.option.timestamp;
+  return out.header.option.osmosis_replication_timestamp;
 }
 
 function updateManifest(

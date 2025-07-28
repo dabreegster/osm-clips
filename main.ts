@@ -70,14 +70,16 @@ function clip(gjPath: string) {
   let [bigPbFPath, url, friendlyName] = findSmallest(gjPath);
   downloadIfNeeded(url, bigPbFPath);
 
-  let outPath = gjPath
+  let outPbfPath = gjPath
     .replace("input/", "output/")
     .replace(".geojson", ".osm.pbf");
-  run(`mkdir -p ${path.dirname(outPath)}`);
+  let outGJPath = gjPath.replace("input/", "output/");
+  run(`mkdir -p ${path.dirname(outPbfPath)}`);
   // Preserve the timestamp
   run(
-    `osmium extract -p ${gjPath} ${bigPbFPath} -o ${outPath} --overwrite --output-header=osmosis_replication_timestamp!`,
+    `osmium extract -p ${gjPath} ${bigPbFPath} -o ${outPbfPath} --overwrite --output-header=osmosis_replication_timestamp!`,
   );
+  run(`cp ${gjPath} ${outGJPath}`);
   updateManifest(
     gjPath.slice("input/".length).slice(0, -".geojson".length),
     friendlyName,

@@ -32,7 +32,9 @@ npm i
 npm run osm-clips sync-all
 ```
 
-You'll wind up with `output/region1/boundaryA.osm.pbf` and such, as well `output/manifest.json`:
+You'll wind up with `output/region1/boundaryA.osm.pbf`,
+`output/region1/boundaryA.geojson` (copied from input), and so on, as well
+`output/manifest.json`:
 
 ```
 {
